@@ -20,22 +20,22 @@ import java.util.HashMap;
 import java.util.Map;
 import java.util.Map.Entry;
 
+import com.google.gwt.http.client.URL;
+
 public final class TokenizerUtils {
-  private static final String PAIR_DIVIDER = "/";
+  private static final String PATH_DELIMITER = "/";
 
-  private static final String COMPOSITE_DIVIDER = "&";
-  private static final String COMPOSITE_EQUALIZER = "=";
+  private static final String QUERY_DELIMITER = "&";
+  private static final String QUERY_EQUALIZER = "=";
 
-  public static final String QUERY_STRING_RAW = "?";
-  public static final String QUERY_STRING = "\\" + QUERY_STRING_RAW;
-
-  public static final String SEPARATOR = "/";
+  public static final String QUERY_START_DELIMITER = "?";
+  public static final String QUERY_START_DELIMITER_PATTERN = "\\" + QUERY_START_DELIMITER;
 
   public static Map<String, String> find(final String token) {
-    final String[] parts = token.split(QUERY_STRING, 2);
+    final String[] parts = token.split(QUERY_START_DELIMITER_PATTERN, 2);
 
-    final Map<String, String> pairs = findPairs(parts[0]);
-    final Map<String, String> composites = findComposite(parts[1]);
+    final Map<String, String> pairs = findPathPairs(parts[0]);
+    final Map<String, String> composites = findQueryPairs(parts[1]);
 
     final Map<String, String> combined = new HashMap<>(composites);
     // Overwrite with pairs
@@ -43,30 +43,67 @@ public final class TokenizerUtils {
     return combined;
   }
 
+  /**
+   * @deprecated Use {@link #findQueryPairs(String)}
+   */
+  @Deprecated
   public static Map<String, String> findComposite(final String token) {
-    return findPairs(token, COMPOSITE_DIVIDER, COMPOSITE_EQUALIZER);
+    return findQueryPairs(token);
   }
 
+  public static Map<String, String> findQueryPairs(final String token) {
+    return findPairs(token, QUERY_DELIMITER, QUERY_EQUALIZER);
+  }
+
+  /**
+   * @deprecated Use {@link #findPathPairs(String)}
+   */
+  @Deprecated
   public static Map<String, String> findPairs(final String token) {
-    return findPairs(token, PAIR_DIVIDER);
+    return findPathPairs(token);
   }
 
+  /**
+   *
+   * @param token
+   * @return
+   */
+  public static Map<String, String> findPathPairs(final String token) {
+    return findPairs(token, PATH_DELIMITER);
+  }
+
+  /**
+   * @deprecated Use {@link #formatQueryPairs(Map)}
+   */
+  @Deprecated
   public static final String formatComposite(final Map<String, String> pairs) {
-    return formatPairs(pairs, COMPOSITE_DIVIDER, COMPOSITE_EQUALIZER);
+    return formatQueryPairs(pairs);
   }
 
+  public static final String formatQueryPairs(final Map<String, String> pairs) {
+    return formatPairs(pairs, QUERY_DELIMITER, QUERY_EQUALIZER);
+  }
+
+  /**
+   * @deprecated Use {@link #formatPathPairs(Map)}
+   */
+  @Deprecated
   public static final String formatPairs(final Map<String, String> pairs) {
-    return formatPairs(pairs, PAIR_DIVIDER, PAIR_DIVIDER);
+    return formatPathPairs(pairs);
   }
 
-  public static Map<String, String> findPairs(final String token, final String divider) {
+  public static final String formatPathPairs(final Map<String, String> pairs) {
+    return formatPairs(pairs, PATH_DELIMITER, PATH_DELIMITER);
+  }
+
+  public static Map<String, String> findPairs(final String token, final String delimiter) {
     final Map<String, String> values = new HashMap<String, String>();
 
     if (token == null || token.isEmpty()) {
       return values;
     }
 
-    final String[] args = token.split(divider);
+    final String[] args = token.split(delimiter);
     for (int i = 0; i < args.length; i += 2) {
       values.put(args[i], args[i + 1]);
     }
@@ -74,23 +111,29 @@ public final class TokenizerUtils {
     return values;
   }
 
-  public static Map<String, String> findPairs(final String token, final String divider, final String equalizer) {
+  public static Map<String, String> findPairs(final String token, final String delimiter, final String equalizer) {
     final Map<String, String> values = new HashMap<String, String>();
 
     if (token == null || token.isEmpty()) {
       return values;
     }
 
-    final String[] args = token.split(divider);
+    final String[] args = token.split(delimiter);
     for (int i = 0; i < args.length; i++) {
       final String[] pair = args[i].split(equalizer, 2);
-      values.put(pair[0], pair[1]);
+
+      final String key = pair[0];
+      if (key.isEmpty()) {
+        continue;
+      }
+      final String val = pair.length > 1 ? pair[1] : null;
+      values.put(URL.decodeQueryString(key), val);
     }
 
     return values;
   }
 
-  public static final String formatPairs(final Map<String, String> pairs, final String divider, final String equalizer) {
+  public static final String formatPairs(final Map<String, String> pairs, final String delimiter, final String equalizer) {
     final StringBuilder sb = new StringBuilder();
     for (final Entry<String, String> entry : pairs.entrySet()) {
       if (entry.getValue() == null) {
@@ -100,10 +143,10 @@ public final class TokenizerUtils {
       sb.append(entry.getKey());
       sb.append(equalizer);
       sb.append(entry.getValue());
-      sb.append(divider);
+      sb.append(delimiter);
     }
 
-    // Remove the last part (divider)
+    // Remove the last part (delimiter)
     if (sb.length() != 0) {
       sb.setLength(sb.length() - 1);
     }
@@ -112,17 +155,17 @@ public final class TokenizerUtils {
   }
 
   public static String format(final Map<String, String> pairs, final Map<String, String> composites) {
-    final String pairToken = formatPairs(pairs);
-    final String compositeToken = formatComposite(composites);
+    final String pathToken = formatPathPairs(pairs);
+    final String queryToken = formatQueryPairs(composites);
 
-    return formatToken(pairToken, compositeToken);
+    return formatToken(pathToken, queryToken);
   }
 
   public static String formatToken(final String base) {
     return base;
   }
 
-  public static String formatToken(final String base, final String query) {
-    return base + (query == null || query.isEmpty() ? "" : QUERY_STRING_RAW) + query;
+  public static String formatToken(final String path, final String query) {
+    return path + (query == null || query.isEmpty() ? "" : (QUERY_START_DELIMITER + query));
   }
 }

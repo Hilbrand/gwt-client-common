@@ -23,6 +23,7 @@ package nl.aerius.wui.place;
  *          a subtype of {@link ApplicationPlace}
  */
 public interface PlaceTokenizer<P extends TokenizedPlace> {
+
   default String getPrefix() {
     return "";
   }
